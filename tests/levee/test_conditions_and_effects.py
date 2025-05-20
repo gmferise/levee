@@ -4,7 +4,7 @@ enable_imports(__file__, '../../src')
 import unittest
 from unittest.mock import Mock, call
 from levee import Chart, State, Condition, Effect
-from levee.exceptions import TransitionMissingArgs
+from levee.exceptions import TransitionMissingArgs, TransitionNotAllowed
 
 mockFn = Mock()
 
@@ -67,5 +67,8 @@ class TestConditions(unittest.TestCase):
         self.assertRaises(TransitionMissingArgs, self.chart.can, TestChart.ALPHA, maybe=True)
         self.assertRaises(TransitionMissingArgs, self.chart.can, TestChart.ALPHA, whatever='twice')
         self.assertRaises(TransitionMissingArgs, self.chart.can, TestChart.ALPHA, sometimes=True, maybe=True)
+        self.assertRaises(TransitionNotAllowed, self.chart.to, TestChart.ALPHA, sometimes=True, maybe=False, whatever='twice')
+        self.assertEqual(self.chart.can(TestChart.ALPHA, sometimes=True, maybe=False, whatever='twice'), False)
+        self.assertEqual(self.chart.can(TestChart.ALPHA, sometimes=True, maybe=True, whatever='twice'), True)
         self.chart.to(TestChart.ALPHA, whatever='twice', sometimes=True, maybe=True)
         self.mockFn.assert_has_calls((call('once'), call('twice'), call('twice')))
