@@ -1,165 +1,76 @@
-from inspect import signature, Parameter
-from levee.exceptions import LeveeException
 from enum import Enum
+from .expressions import ExpressionMeta, Operator, Equation, Operand
 
-class Operator(Enum):
-    NONE = ''
-    NOT = 'not'
-    OR = 'or'
-    AND = 'and'
 
-UNARY_OPERATORS = [
-    Operator.NONE,
-    Operator.NOT,
-]
-
-BINARY_OPERATORS = [
-    Operator.OR,
-    Operator.AND,
-]
-
-class ConditionalOps():
+class ConditionMeta(ExpressionMeta):
+    class Operators(Enum):
+        NOT = Operator('~')
+        OR = Operator('|', 2)
+        AND = Operator('&', 2)
 
     def __or__(self, other):
-        return ConditionalExpression(self, other, operator=Operator.OR)
+        return ConditionalExpression(self, other, operator=self.Operators.OR)
 
     def __and__(self, other):
-        return ConditionalExpression(self, other, operator=Operator.AND)
+        return ConditionalExpression(self, other, operator=self.Operators.AND)
 
     def __invert__(self):
-        return ConditionalExpression(self, operator=Operator.NOT)
+        return ConditionalExpression(self, operator=self.Operators.NOT)  
 
-class ConditionalMeta(ConditionalOps, type):
-
-    def __init__(self, name, extends, attrs, **kwargs):
-        allowed_kinds = [Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY]
-        if self._allow_kwargs:
-            allowed_kinds.append(Parameter.VAR_KEYWORD)
-        if any(
-            param.kind not in allowed_kinds
-            for param in signature(self.eval).parameters.values()
-        ):
-            raise LeveeException(f'{name}: Parameters for ``eval`` must be passable by keyword and non-variable')
-        return super().__init__(name, extends, attrs, **kwargs)
-
-    def __str__(self):
-        return self.__name__
-
-class Conditional(ConditionalOps, metaclass=ConditionalMeta):
-
-    _allow_kwargs = False
-
-    def eval(self):
-        pass
-
-    @property
-    def params(self):
-        return set()
-    
-    @property
-    def required_params(self):
-        return set()
-
-class ConditionalExpression(Conditional):
-
-    _allow_kwargs = True
-
-    def __init__(self, *values, operator=Operator.NONE):
-        if not isinstance(operator, Operator):
-            raise TypeError(type(operator))
-        if not all(
-            isinstance(value, ConditionalExpression)
-            or issubclass(value, Condition)
-            for value in values
-        ):
-            raise TypeError([type(value) for value in values])
-        if (
-            len(values) == 0 and operator is not Operator.NONE
-            or len(values) > 1 and operator in UNARY_OPERATORS
-            or len(values) < 2 and operator in BINARY_OPERATORS
-        ):
-            raise ValueError(operator, values)
-        self.operator = operator
-        self.values = tuple(value() for value in values)
+class ConditionalExpression(Equation, metaclass=ConditionMeta):
+    calc = 'eval'
 
     def eval(self, **kwargs):
-        if self.operator is Operator.NONE:
-            if len(self.values):
-                return self.values[0].eval(**kwargs)
-        elif self.operator is Operator.NOT:
-            return not self.values[0].eval(**kwargs)
-        elif self.operator is Operator.OR:
-            return self.values[0].eval(**kwargs) or self.values[1].eval(**kwargs)
-        elif self.operator is Operator.AND:
-            return self.values[0].eval(**kwargs) and self.values[1].eval(**kwargs)
-    
-    @property
-    def params(self):
-        params = set()
-        for value in self.values:
-            params |= value.params
-        return params
-    
-    @property
-    def required_params(self):
-        required_params = set()
-        for value in self.values:
-            required_params |= value.required_params
-        return required_params
-
-    def __bool__(self):
-        return len(self.values) > 0
+        if len(self.values) == 0:
+            return
+        eval_operand = lambda operand: operand.eval(**{
+            k: v
+            for k, v in kwargs.items()
+            if k in operand.params
+        })
+        if self.operator is None:
+            return eval_operand(self.values[0])
+        if self.operator is self.Operators.NOT:
+            return not eval_operand(self.values[0])
+        if self.operator is self.Operators.OR:
+            return eval_operand(self.values[0]) or eval_operand(self.values[1])
+        if self.operator is self.Operators.AND:
+            return eval_operand(self.values[0]) and eval_operand(self.values[1])
 
     def __str__(self):
-        if self.operator is Operator.NONE:
-            if len(self.values):
-                return str(self.values[0])
+        if len(self.values) == 0:
             return ''
-        elif self.operator is Operator.NOT:
-            return f'~{self.values[0]}'
-        elif self.operator is Operator.OR:
-            return f'({self.values[0]} | {self.values[1]})'
-        elif self.operator is Operator.AND:
-            return f'({self.values[0]} & {self.values[1]})'
+        if self.operator is None:
+            return str(self.values[0])
+        if self.operator is self.Operators.NOT:
+            return f'{self.Operators.NOT}{self.values[0]}'
+        if self.operator is self.Operators.OR:
+            return f'({self.values[0]} {self.Operators.OR} {self.values[1]})'
+        if self.operator is self.Operators.AND:
+            return f'({self.values[0]} {self.Operators.AND} {self.values[1]})'
 
-class Condition(Conditional):
+class Condition(Operand, metaclass=ConditionMeta):
     """
-    Extend this class and define a pass condition in its ``eval`` function.
-    When calling ``Chart.to()``, any kwargs passed will be provided to ``eval``
+    Extend this class and define a pass condition in its `eval` function.
+    When calling `Chart.to()`, any kwargs passed will be provided to `eval`
     by name.
 
-    ``Conditions`` can be combined like booleans with these operators:
+    `Conditions` can be combined like booleans with these operators:
     - `not` --> `~`
     - `and` --> `&`
     - `or` --> `|`
 
-    ``Conditions`` can be added to a transition with this chart syntax:
+    `Conditions` can be added to a transition with this chart syntax:
     ```
     FROM_STATE: {
         TO_STATE (Condition1 & Condition2 | ~Condition3): ...
     }
     ```
     """
+    calc = 'eval'
 
     def eval(self):
         """
         Return a value that is not True to block the transition
         """
         return True
-    
-    @property
-    def params(self):
-        return set(
-            param.name
-            for param in signature(self.eval).parameters.values()
-            if param.kind in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-        )
-    
-    @property
-    def required_params(self):
-        return set(
-            param.name
-            for param in signature(self.eval).parameters.values()
-            if param.kind in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-            if param.default is Parameter.empty
-        )

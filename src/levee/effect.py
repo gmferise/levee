@@ -1,111 +1,55 @@
-from inspect import Parameter, signature, isclass
-from levee.exceptions import LeveeException
+from enum import Enum
+from .expressions import ExpressionMeta, Operator, Equation, Operand
 
-class ChainableOps():
 
-    def __add__(self, other):
-        return EffectChain(self, other)
-
-class ChainableMeta(ChainableOps, type):
-
-    def __init__(self, name, extends, attrs, **kwargs):
-        allowed_kinds = [Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY]
-        if self._allow_kwargs:
-            allowed_kinds.append(Parameter.VAR_KEYWORD)
-        if any(
-            param.kind not in allowed_kinds
-            for param in signature(self.exec).parameters.values()
-        ):
-            raise LeveeException(f'{name}: Parameters for ``exec`` must be must be passable by keyword and non-variable')
-        return super().__init__(name, extends, attrs, **kwargs)
-
-    def __str__(self):
-        return self.__name__
-
-class Chainable(ChainableOps, metaclass=ChainableMeta):
-
-    _allow_kwargs = False
-
-    def exec(self):
-        pass
-
-    @property
-    def params(self):
-        return set()
+class EffectMeta(ExpressionMeta):
+    class Operators(Enum):
+        PLUS = Operator('+', 2)
     
-    @property
-    def required_params(self):
-        return set()
+    def __add__(self, other):
+        return EffectExpression(self, other, operator=self.Operators.PLUS)
 
-class EffectChain(Chainable):
-
-    _allow_kwargs = True
-
-    def __init__(self, *expression):
-        self.values = []
-        for operand in expression:
-            if isinstance(operand, EffectChain):
-                self.values.extend(operand.values)
-            elif isclass(operand) and issubclass(operand, Effect):
-                self.values.append(operand())
-            else:
-                raise TypeError(type(operand))
+class EffectExpression(Equation, metaclass=EffectMeta):
+    calc = 'exec'
 
     def exec(self, **kwargs):
-        for effect in self.values:
-            effect.exec(**kwargs)
-    
-    @property
-    def params(self):
-        params = set()
-        for value in self.values:
-            params |= value.params
-        return params
-    
-    @property
-    def required_params(self):
-        required_params = set()
-        for value in self.values:
-            required_params |= value.required_params
-        return required_params
-
-    def __bool__(self):
-        return len(self.values) > 0
+        if len(self.values) == 0:
+            return
+        exec_operand = lambda operand: operand.exec(**{
+            k: v
+            for k, v in kwargs.items()
+            if k in operand.params
+        })
+        if self.operator is None:
+            exec_operand(self.values[0])
+            return
+        if self.operator is self.Operators.PLUS:
+            exec_operand(self.values[0])
+            exec_operand(self.values[1])
+            return
 
     def __str__(self):
-        inner = ' + '.join(str(value) for value in self.values)
-        return f'[{inner}]' if inner else ''
+        if len(self.values) == 0:
+            return ''
+        if self.operator is None:
+            return str(self.values[0])
+        if self.operator is self.Operators.PLUS:
+            return f'{self.values[0]} {self.Operators.PLUS} {self.values[1]}'
 
-class Effect(Chainable):
+class Effect(Operand, metaclass=EffectMeta):
     """
-    Extend this class and define logic in its ``exec`` function.
-    Named arguments can be added to the ``exec`` signature to require these
-    arguments to be provided when calling ``Chart.to()``.
+    Extend this class and define logic in its `exec` function.
+    Named arguments can be added to the `exec` signature to require these
+    arguments to be provided when calling `Chart.to()`.
 
-    ``Effects`` can be added to a transition with this chart syntax:
+    `Effects` can be added to a transition with this chart syntax:
     ```
     FROM_STATE: {
         TO_STATE [Effect1 + Effect2 + Effect3]: ...
     }
     ```
     """
+    calc = 'exec'
 
     def exec(self):
         pass
-
-    @property
-    def params(self):
-        return set(
-            param.name
-            for param in signature(self.exec).parameters.values()
-            if param.kind in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-        )
-    
-    @property
-    def required_params(self):
-        return set(
-            param.name
-            for param in signature(self.exec).parameters.values()
-            if param.kind in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
-            if param.default is Parameter.empty
-        )
