@@ -19,7 +19,7 @@ class TestChart(Chart):
         },
     }
 
-class TestNested(unittest.TestCase):
+class Tests(unittest.TestCase):
 
     def setUp(self):
         self.data = { 'state': None }

@@ -36,7 +36,7 @@ class TestChart(Chart):
         },
     }
 
-class TestConditions(unittest.TestCase):
+class Tests(unittest.TestCase):
 
     def setUp(self):
         self.data = { 'state': None }
