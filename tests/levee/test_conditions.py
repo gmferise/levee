@@ -44,6 +44,8 @@ class TestChart(Chart):
         GAMMA: {
             ALPHA (Sometimes & Maybe): ...,
             BETA (Sometimes | Maybe): ...,
+            GAMMA (Maybe & Maybe): ...,
+            DELTA (Maybe | Maybe): ...,
         },
         DELTA: {
             ALPHA (Maybe): ...,
@@ -103,6 +105,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.chart.can(TestChart.ALPHA, sometimes=True, maybe=False), False)
         self.assertEqual(self.chart.can(TestChart.ALPHA, sometimes=False, maybe=True), False)
         self.assertEqual(self.chart.can(TestChart.ALPHA, sometimes=False, maybe=False), False)
+        self.assertEqual(self.chart.can(TestChart.GAMMA, maybe=True), True)
+        self.assertEqual(self.chart.can(TestChart.GAMMA, maybe=False), False)
 
     def test_or(self):
         self.chart.to(TestChart.BETA)
@@ -112,4 +116,6 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.chart.can(TestChart.BETA, sometimes=True, maybe=False), True)
         self.assertEqual(self.chart.can(TestChart.BETA, sometimes=False, maybe=True), True)
         self.assertEqual(self.chart.can(TestChart.BETA, sometimes=False, maybe=False), False)
+        self.assertEqual(self.chart.can(TestChart.DELTA, maybe=True), True)
+        self.assertEqual(self.chart.can(TestChart.DELTA, maybe=False), False)
         
