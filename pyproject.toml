@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "levee"
+version = "1.0.0"
+dependencies = []
+authors = [
+  { name="Gavin Ferise" email="gmferise@gmail.com" },
+]
+description = "Create state machines with a visually pleasing syntax"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
+keywords = ["state", "machine", "machines", "state machine", "state machines", "transition", "transitions", "flow", "chart", "flow chart", "flow charts"]
+
+[project.urls]
+Homepage = "https://github.com/gmferise/levee"
+Issues = "https://github.com/gmferise/levee/issues"
