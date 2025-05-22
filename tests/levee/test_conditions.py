@@ -9,6 +9,7 @@ class TestChart(Chart):
     class ALPHA(State): pass
     class BETA(State): pass
     class GAMMA(State): pass
+    class DELTA(State): pass
 
     class Always(Condition):
 
@@ -34,6 +35,7 @@ class TestChart(Chart):
         ALPHA: {
             BETA (Always): ...,
             GAMMA (Never): ...,
+            DELTA: ...,
         },
         BETA: {
             GAMMA (Sometimes): ...,
@@ -43,9 +45,13 @@ class TestChart(Chart):
             ALPHA (Sometimes & Maybe): ...,
             BETA (Sometimes | Maybe): ...,
         },
+        DELTA: {
+            ALPHA (Maybe): ...,
+            BETA (~Maybe): ...,
+        }
     }
 
-class TestConditions(unittest.TestCase):
+class Tests(unittest.TestCase):
 
     def setUp(self):
         self.data = { 'state': None }
@@ -81,6 +87,14 @@ class TestConditions(unittest.TestCase):
             self.chart.choices(sometimes=False),
         )
     
+    def test_maybe(self):
+        self.chart.to(TestChart.DELTA)
+        self.assertEqual(self.chart.state, TestChart.DELTA)
+        self.assertEqual(self.chart.can(TestChart.ALPHA, maybe=True), True)
+        self.assertEqual(self.chart.can(TestChart.ALPHA, maybe=False), False)
+        self.assertEqual(self.chart.can(TestChart.BETA, maybe=True), False)
+        self.assertEqual(self.chart.can(TestChart.BETA, maybe=False), True)
+            
     def test_and(self):
         self.chart.to(TestChart.BETA)
         self.chart.to(TestChart.GAMMA, sometimes=True)

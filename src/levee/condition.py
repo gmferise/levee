@@ -31,11 +31,24 @@ class ConditionalExpression(Equation, metaclass=ConditionMeta):
         if self.operator is None:
             return eval_operand(self.values[0])
         if self.operator is self.Operators.NOT:
-            return not eval_operand(self.values[0])
+            return eval_operand(self.values[0]) != True
         if self.operator is self.Operators.OR:
-            return eval_operand(self.values[0]) or eval_operand(self.values[1])
+            left_value = eval_operand(self.values[0])
+            right_value = eval_operand(self.values[1])
+            if left_value != True and right_value != True:
+                return f'{left_value} and {right_value}'
+            if left_value == True:
+                return left_value
+            return right_value
         if self.operator is self.Operators.AND:
-            return eval_operand(self.values[0]) and eval_operand(self.values[1])
+            left_value = eval_operand(self.values[0])
+            right_value = eval_operand(self.values[1])
+            if left_value != True and right_value != True:
+                return f'{left_value} and {right_value}'
+            if left_value != True:
+                return left_value
+            return right_value
+            
 
     def __str__(self):
         if len(self.values) == 0:
